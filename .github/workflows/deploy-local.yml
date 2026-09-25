@@ -16,12 +16,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Pull latest image from Docker Hub
+        shell: bash
         run: docker compose -f docker-compose-prod.yaml pull
 
       - name: Restart containers with new image
+        shell: bash
         run: docker compose -f docker-compose-prod.yaml up -d
 
       - name: Wait for containers to be healthy
+        shell: bash
         run: |
           for i in {1..15}; do
             MONGO_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nammongodb)
