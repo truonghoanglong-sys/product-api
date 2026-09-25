@@ -1,0 +1,50 @@
+name: CD - Push to Docker Hub
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t product-api:ci .
+
+      - name: Start stack with docker compose
+        run: docker compose up -d --build
+
+      - name: Wait for containers to be healthy
+        run: |
+          for i in {1..15}; do
+            MONGO_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nammongodb)
+            API_STATUS=$(docker inspect --format='{{.State.Health.Status}}' product-api)
+            echo "mongodb: $MONGO_STATUS | api: $API_STATUS"
+            if [ "$MONGO_STATUS" = "healthy" ] && [ "$API_STATUS" = "healthy" ]; then
+              echo "Both containers healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Containers did not become healthy in time"
+          docker compose logs
+          exit 1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag and push image
+        run: |
+          docker tag product-api:ci ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+
+      - name: Tear down
+        if: always()
+        run: docker compose down
