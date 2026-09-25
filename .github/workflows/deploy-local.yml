@@ -16,34 +16,34 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Show workspace and docker version (debug)
-        shell: bash
         run: |
-          pwd
-          ls -la
+          Get-Location
+          Get-ChildItem
           docker --version
           docker compose version
 
       - name: Pull latest image from Docker Hub
-        shell: bash
         run: docker compose -f docker-compose-prod.yaml pull
 
       - name: Restart containers with new image
-        shell: bash
         run: docker compose -f docker-compose-prod.yaml up -d
 
       - name: Wait for containers to be healthy
-        shell: bash
         run: |
-          for i in {1..15}; do
-            MONGO_STATUS=$(docker inspect --format='{{.State.Health.Status}}' nammongodb)
-            API_STATUS=$(docker inspect --format='{{.State.Health.Status}}' product-api)
-            echo "mongodb: $MONGO_STATUS | api: $API_STATUS"
-            if [ "$MONGO_STATUS" = "healthy" ] && [ "$API_STATUS" = "healthy" ]; then
-              echo "Deployment successful, both containers healthy"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Containers did not become healthy after deploy"
-          docker compose -f docker-compose-prod.yaml logs
-          exit 1
+          $healthy = $false
+          for ($i = 1; $i -le 15; $i++) {
+            $mongoStatus = docker inspect --format='{{.State.Health.Status}}' nammongodb
+            $apiStatus = docker inspect --format='{{.State.Health.Status}}' product-api
+            Write-Host "mongodb: $mongoStatus | api: $apiStatus"
+            if ($mongoStatus -eq "healthy" -and $apiStatus -eq "healthy") {
+              Write-Host "Deployment successful, both containers healthy"
+              $healthy = $true
+              break
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $healthy) {
+            Write-Host "Containers did not become healthy after deploy"
+            docker compose -f docker-compose-prod.yaml logs
+            exit 1
+          }
