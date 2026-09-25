@@ -15,6 +15,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Show workspace and docker version (debug)
+        shell: bash
+        run: |
+          pwd
+          ls -la
+          docker --version
+          docker compose version
+
       - name: Pull latest image from Docker Hub
         shell: bash
         run: docker compose -f docker-compose-prod.yaml pull
