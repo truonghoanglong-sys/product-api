@@ -1,4 +1,4 @@
-name: Product API CI (Production)
+name: Product API CI/CD (Production)
 
 on:
   push:
@@ -6,7 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  DOCKERHUB_REPO: hoanglongdocker1/product-api
+
 jobs:
+  # ---------- CI 1: test CRUD voi MongoDB that ----------
   test:
     name: Test CRUD với MongoDB
     runs-on: ubuntu-latest
@@ -42,8 +46,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # ---------- CI 2: build image + healthcheck + smoke test ----------
   docker-smoke:
-    name: Build image và smoke test
+    name: Build image và healthcheck
     runs-on: ubuntu-latest
     needs: test
 
@@ -59,7 +64,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t product-api:ci .
@@ -69,16 +75,76 @@ jobs:
           docker run -d --name product-api --network host \
             -e PORT=3000 \
             -e MONGO_URI=mongodb://127.0.0.1:27017/productdb \
+            --health-interval=5s --health-start-period=5s \
             product-api:ci
 
-      - name: Wait for /health
+      - name: Chờ Docker HEALTHCHECK báo healthy
         run: |
-          for i in $(seq 1 20); do
-            if curl -fs http://127.0.0.1:3000/health; then
-              echo; echo "API healthy"; exit 0
-            fi
-            sleep 3
+          for i in $(seq 1 24); do
+            STATUS=$(docker inspect --format '{{.State.Health.Status}}' product-api)
+            echo "Lan $i: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then echo "Container healthy"; exit 0; fi
+            if [ "$STATUS" = "unhealthy" ]; then echo "Container unhealthy"; exit 1; fi
+            sleep 5
           done
-          echo "API không lên được"
-          docker logs product-api
+          echo "Het thoi gian cho healthcheck"
           exit 1
+
+      - name: Kiểm tra /health trả về db connected
+        run: |
+          RES=$(curl -fs http://127.0.0.1:3000/health)
+          echo "$RES"
+          echo "$RES" | grep -q '"db":"connected"'
+
+      - name: Smoke test CRUD
+        run: |
+          set -e
+          curl -fs -X POST http://127.0.0.1:3000/api/products \
+            -H "Content-Type: application/json" \
+            -d '{"pid":1,"pname":"Smoke","price":1000,"quantity":1}'; echo
+          curl -fs http://127.0.0.1:3000/api/products/1; echo
+          curl -fs -X PUT http://127.0.0.1:3000/api/products/1 \
+            -H "Content-Type: application/json" -d '{"quantity":5}'; echo
+          curl -fs -X DELETE http://127.0.0.1:3000/api/products/1; echo
+
+      - name: In log container khi lỗi
+        if: failure()
+        run: docker logs product-api
+
+  # ---------- CD: push image len Docker Hub ----------
+  push-dockerhub:
+    name: Push image lên Docker Hub
+    runs-on: ubuntu-latest
+    needs: docker-smoke
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tạo tag cho image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_REPO }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=1.0
+            type=sha,prefix=sha-
+
+      - name: Build và push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
