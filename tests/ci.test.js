@@ -1,1 +1,1 @@
-test('ci',()=>expect(1+1).toBe(2))
+test('404',()=>require('supertest')(require('../src/app')).get('/x').expect(404))
