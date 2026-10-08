@@ -148,3 +148,47 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # ---------- CD 2: tu dong deploy len Docker Engine tren laptop ----------
+  deploy-local:
+    name: Deploy lên Local Docker Engine
+    runs-on: [self-hosted, Windows, local-docker]
+    needs: push-dockerhub
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pull image đúng commit và khởi động lại
+        run: |
+          $env:IMAGE_TAG = "sha-" + "${{ github.sha }}".Substring(0,7)
+          Write-Host "Deploy image tag: $env:IMAGE_TAG"
+          docker compose -f docker-compose-prod.yaml pull
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          docker compose -f docker-compose-prod.yaml up -d
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Chờ container healthy
+        run: |
+          for ($i = 1; $i -le 24; $i++) {
+            $s = docker inspect --format '{{.State.Health.Status}}' product-api-prod
+            Write-Host "Lan ${i}: $s"
+            if ($s -eq 'healthy') { Write-Host "Container healthy"; exit 0 }
+            if ($s -eq 'unhealthy') { docker logs product-api-prod; exit 1 }
+            Start-Sleep -Seconds 5
+          }
+          docker logs product-api-prod
+          exit 1
+
+      - name: Kiểm tra /health
+        run: |
+          $r = Invoke-RestMethod -Uri http://localhost:3001/health
+          $r | ConvertTo-Json
+          if ($r.db -ne 'connected') { exit 1 }
+
+      - name: Dọn image cũ không dùng
+        run: docker image prune -f
