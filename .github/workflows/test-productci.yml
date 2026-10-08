@@ -1,0 +1,42 @@
+name: Test Product CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: Kiem tra va build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Lay ma nguon
+        uses: actions/checkout@v6
+
+      - name: Cai Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: In phien ban cong cu
+        run: |
+          node -v
+          npm -v
+          docker --version
+          docker compose version
+
+      - name: Cai thu vien
+        run: npm ci
+
+      - name: Kiem tra cu phap ma nguon
+        run: find src -name "*.js" -print0 | xargs -0 -n1 node --check
+
+      - name: Kiem tra file docker-compose.yml
+        run: docker compose config -q
+
+      - name: Build Docker image
+        run: docker build -t product-api:ci .
