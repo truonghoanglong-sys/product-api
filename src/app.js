@@ -1,12 +1,18 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const productRoutes = require('./routes/product.routes');
 
 const app = express();
 
 app.use(express.json());
 
+// Healthcheck: 200 khi đã kết nối MongoDB, 503 khi mất kết nối
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  const connected = mongoose.connection.readyState === 1;
+  res.status(connected ? 200 : 503).json({
+    status: connected ? 'ok' : 'error',
+    db: connected ? 'connected' : 'disconnected',
+  });
 });
 
 app.use('/api/products', productRoutes);
