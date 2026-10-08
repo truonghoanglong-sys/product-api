@@ -1,0 +1,16 @@
+{
+  "name": "product-api",
+  "version": "1.0.0",
+  "description": "REST API CRUD cho Product dùng Express và Mongoose",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "mongoose": "^9.11.1"
+  }
+}
