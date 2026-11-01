@@ -21,7 +21,7 @@ const productSchema = new mongoose.Schema(
     },
     quantity: {
       type: Number,
-      required: [false, 'quantity là bắt buộc'],
+      required: [true, 'quantity là bắt buộc'],
       min: [0, 'quantity không được âm'],
       validate: { validator: Number.isInteger, message: 'quantity phải là số nguyên' },
     },
