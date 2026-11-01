@@ -1,6 +1,6 @@
 services:
   mongodb:
-    image: mongo:8.0
+    image: mongo:9.0.2
     container_name: nammongodb
     command: ["mongod", "--auth"]
     restart: unless-stopped
