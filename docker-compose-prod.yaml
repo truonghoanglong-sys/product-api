@@ -4,7 +4,7 @@ name: product-api-prod
 
 services:
   mongodb:
-    image: mongo:9.0.2
+    image: mongo:8.0
     container_name: nammongodb-prod
     restart: unless-stopped
     volumes:
