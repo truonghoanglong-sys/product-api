@@ -13,7 +13,7 @@ jobs:
   # ---------- CI 1: test CRUD voi MongoDB that ----------
   test:
     name: Test CRUD với MongoDB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     services:
       mongodb:
@@ -49,7 +49,7 @@ jobs:
   # ---------- CI 2: build image + healthcheck + smoke test ----------
   docker-smoke:
     name: Build image và healthcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: test
 
     services:
